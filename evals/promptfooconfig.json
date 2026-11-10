@@ -1,0 +1,140 @@
+{
+  "description": "AI Writer Agent regression smoke suite",
+  "sharing": false,
+  "prompts": [
+    "{{task}}"
+  ],
+  "providers": [
+    "file://agent-provider.cjs"
+  ],
+  "defaultTest": {
+    "assert": [
+      {
+        "type": "javascript",
+        "value": "const result = typeof output === 'string' ? JSON.parse(output) : output;\nreturn result.answer.length > 0 && Number.isFinite(result.metrics.firstVisibleMs) && Number.isFinite(result.metrics.finalAnswerStartMs) && result.metrics.finalAnswerStartMs >= result.metrics.firstVisibleMs;",
+        "metric": "response_delivery"
+      }
+    ],
+    "options": {
+      "disableVarExpansion": true
+    }
+  },
+  "tests": [
+    {
+      "description": "跨章查证：两份原文各包含一条事实",
+      "vars": {
+        "task": "请先读取第一章.md 和第二章.md，再根据原文回答：铜钥匙藏在什么容器里？能打开北门的铁钥匙留在哪里？请分别给出地点。",
+        "script": [
+          {
+            "tools": [
+              [
+                "readFile",
+                {
+                  "filepath": "第一章.md"
+                }
+              ],
+              [
+                "readFile",
+                {
+                  "filepath": "第二章.md"
+                }
+              ]
+            ]
+          },
+          {
+            "text": "铜钥匙藏在蓝瓷罐里，铁钥匙留在旧钟楼。"
+          }
+        ]
+      },
+      "assert": [
+        {
+          "type": "javascript",
+          "value": "const result = typeof output === 'string' ? JSON.parse(output) : output;\nreturn result.answer.includes('蓝瓷罐') && result.answer.includes('旧钟楼') && ['第一章.md', '第二章.md'].every(path => result.tools.some(tool => tool.name === 'readFile' && tool.path === path && tool.status === 'success')) && result.metrics.carriedEvidenceTokens.some(tokens => tokens > 0);",
+          "metric": "grounding"
+        },
+        {
+          "type": "javascript",
+          "value": "const result = typeof output === 'string' ? JSON.parse(output) : output;\nreturn result.writes.length === 0 && result.chapter === '她走到窗前。\\n桌上放着一盏油灯。\\n';",
+          "metric": "no_write"
+        }
+      ]
+    },
+    {
+      "description": "批准改稿：只替换目标句",
+      "vars": {
+        "task": "请在第三章.md 中只将「她走到窗前。」替换为「她在窗前停下。」。不要修改其他任何内容。",
+        "approve": true,
+        "script": [
+          {
+            "tools": [
+              [
+                "modifyFile",
+                {
+                  "filepath": "第三章.md",
+                  "operations": [
+                    {
+                      "type": "replace",
+                      "oldText": "她走到窗前。",
+                      "newText": "她在窗前停下。"
+                    }
+                  ]
+                }
+              ]
+            ]
+          },
+          {
+            "text": "已替换目标句。"
+          }
+        ]
+      },
+      "assert": [
+        {
+          "type": "javascript",
+          "value": "const result = typeof output === 'string' ? JSON.parse(output) : output;\nreturn result.approvals === 1 && result.writes.length === 1 && result.writes[0] === '第三章.md' && result.chapter === '她在窗前停下。\\n桌上放着一盏油灯。\\n';",
+          "metric": "exact_edit"
+        }
+      ]
+    },
+    {
+      "description": "拒绝改稿：审批被拒绝后文件不变",
+      "vars": {
+        "task": "请在第三章.md 中只将「她走到窗前。」替换为「她在窗前停下。」。不要修改其他任何内容。",
+        "approve": false,
+        "script": [
+          {
+            "tools": [
+              [
+                "modifyFile",
+                {
+                  "filepath": "第三章.md",
+                  "operations": [
+                    {
+                      "type": "replace",
+                      "oldText": "她走到窗前。",
+                      "newText": "她在窗前停下。"
+                    }
+                  ]
+                }
+              ]
+            ]
+          },
+          {
+            "text": "修改已被拒绝，文件未变更。"
+          }
+        ]
+      },
+      "assert": [
+        {
+          "type": "javascript",
+          "value": "const result = typeof output === 'string' ? JSON.parse(output) : output;\nreturn result.approvals >= 1 && result.tools.some(tool => tool.name === 'modifyFile' && tool.status === 'rejected');",
+          "metric": "approval_rejected"
+        },
+        {
+          "type": "javascript",
+          "value": "const result = typeof output === 'string' ? JSON.parse(output) : output;\nreturn result.writes.length === 0 && result.chapter === '她走到窗前。\\n桌上放着一盏油灯。\\n';",
+          "metric": "no_write"
+        }
+      ]
+    }
+  ]
+}

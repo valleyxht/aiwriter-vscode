@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<!--
+ * AI Writer - VSCode 小说创作助手插件
+ *
+ * index.html - Webview 主 HTML 文件
+ * 功能：定义插件侧边栏的页面结构和布局
+ * 包含：工具栏、消息列表、输入区域、设置面板、会话下拉菜单等
+-->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{cspSource}}; script-src {{cspSource}}; img-src {{cspSource}} data:; font-src {{cspSource}};">
+    <title>AI Writer</title>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="toolbar">
+            <div class="toolbar-left">
+                <button id="sessions-btn" title="查看历史会话" class="icon-btn toolbar-session-btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>会话</span>
+                </button>
+                <span class="app-title" id="active-session-title">AI Writer</span>
+            </div>
+            <div class="toolbar-actions">
+                <button id="new-session-btn" title="新建会话" class="icon-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                </button>
+                <button id="project-tools-btn" title="创作工具" aria-label="创作工具" class="icon-btn" aria-expanded="false" aria-controls="project-tools-menu">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M20.24 12.24a6 6 0 0 0-8.48-8.48L3 12.5V21h8.5Z"></path>
+                        <path d="m16 8-14 14M9 15h6"></path>
+                    </svg>
+                </button>
+                <button id="settings-btn" title="设置" class="icon-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42m12.72-12.72l1.42-1.42"></path>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <div id="sessions-dropdown" class="sessions-dropdown hidden">
+            <div class="sessions-dropdown-header">
+                <span class="sessions-title">历史会话</span>
+                <span class="sessions-hint">选择一个会话继续</span>
+            </div>
+            <div id="sessions-list" class="sessions-list"></div>
+        </div>
+
+        <div id="project-tools-menu" class="project-tools-menu hidden" role="region" aria-label="创作工具">
+            <div class="project-tools-header">
+                <span>创作工具</span>
+                <span>独立功能</span>
+            </div>
+            <section class="project-tool-card" aria-labelledby="organization-tool-title">
+                <div class="project-tool-heading">
+                    <span class="project-tool-icon" aria-hidden="true">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path>
+                            <path d="M8 11h8M8 15h5"></path>
+                        </svg>
+                    </span>
+                    <div class="project-tool-copy">
+                        <h3 id="organization-tool-title">整理 Markdown 项目</h3>
+                        <p>梳理目录、拆分文件，预览确认后再保存。</p>
+                    </div>
+                </div>
+                <div class="project-tool-actions">
+                    <button id="organize-project-btn" class="secondary-btn" type="button">选择文件夹并整理</button>
+                </div>
+                <div id="organization-status" class="project-tool-status" aria-live="polite"></div>
+            </section>
+            <section id="rag-status-panel" class="project-tool-card" data-status="DISABLED" aria-labelledby="index-tool-title">
+                <div class="project-tool-heading">
+                    <span class="project-tool-icon" aria-hidden="true">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="10" cy="10" r="6"></circle>
+                            <path d="m15 15 6 6M7 8h6M7 11h4"></path>
+                        </svg>
+                    </span>
+                    <div class="project-tool-copy">
+                        <h3 id="index-tool-title">资料检索索引</h3>
+                        <p>为所选正文建立索引，按语义查找相关片段。</p>
+                    </div>
+                </div>
+                <div class="project-tool-actions">
+                    <button id="rag-build-index-btn" type="button" class="secondary-btn">选择文件并构建索引</button>
+                </div>
+                <div class="project-tool-status" aria-live="polite">
+                    <div class="rag-status-row">
+                        <span>索引状态</span>
+                        <span id="rag-status-label" class="rag-status-badge">未启用</span>
+                    </div>
+                    <div id="rag-status-detail">启用后可构建索引</div>
+                    <div id="rag-quality-detail" class="hidden"></div>
+                </div>
+            </section>
+            <section class="project-tool-card" aria-labelledby="summary-tool-title">
+                <div class="project-tool-heading">
+                    <span class="project-tool-icon" aria-hidden="true">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 5c-3-2-6-2-10-1v15c4-1 7-1 10 1 3-2 6-2 10-1V4c-4-1-7-1-10 1ZM12 5v15M5 8h4M5 12h4M15 8h4M15 12h4"></path>
+                        </svg>
+                    </span>
+                    <div class="project-tool-copy">
+                        <h3 id="summary-tool-title">章节摘要</h3>
+                        <p>逐章生成可编辑摘要，默认补缺，选章更新。</p>
+                    </div>
+                </div>
+                <div class="project-tool-actions">
+                    <button data-research-action="update" class="secondary-btn" type="button">生成 / 更新摘要</button>
+                    <button data-research-action="ignore" class="project-tool-text-btn" type="button">配置忽略规则</button>
+                </div>
+                <div id="research-status" class="project-tool-status" aria-live="polite"></div>
+            </section>
+        </div>
+
+        <main id="messages-container" class="messages-container" aria-live="polite"></main>
+
+        <div id="selections-panel" class="selections-panel hidden">
+            <div class="selections-header">
+                <span class="selections-title">上下文</span>
+                <button id="clear-selections-btn" class="icon-btn" title="清空">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div id="selections-list" class="selections-list"></div>
+        </div>
+
+        <div id="diff-panel" class="diff-panel hidden">
+            <div class="diff-header">
+                <span class="diff-title">待确认的文件修改</span>
+                <button id="diff-close-btn" class="icon-btn" title="全部拒绝并关闭" style="width:20px;height:20px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div id="diff-list" class="diff-list"></div>
+        </div>
+
+        <div class="input-area">
+            <div class="input-wrapper">
+                <textarea
+                    id="message-input"
+                    placeholder="描述你的需求，AI 会自动规划并选择合适的处理方式"
+                    rows="1"
+                ></textarea>
+                <button id="send-button" title="发送 (Enter)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <path d="M2.01 21L23 12 2.01 3M10 9V3h4v6h-4v6l-5.29 5.29-5.29-5.29-5.29-5.29-5.29-5.29-5.29z" fill="currentColor"/>
+                    </svg>
+                </button>
+                <button id="stop-button" class="hidden" title="停止生成">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="6" y="6" width="12" height="12" rx="1" />
+                    </svg>
+                </button>
+            </div>
+            <div class="composer-meta">
+                <span>Enter 发送 · Shift+Enter 换行</span>
+                <span id="request-state" class="request-state">就绪</span>
+            </div>
+            <div id="token-bar" class="token-bar">
+                <span id="token-count" class="token-count">Tokens: --</span>
+                <span id="token-usage" class="token-usage">Usage: --%</span>
+            </div>
+        </div>
+
+        <div id="settings-panel" class="settings-panel hidden">
+            <div class="settings-header">
+                <span class="settings-title">AI 配置</span>
+                <button id="close-settings-btn" title="关闭" class="icon-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="settings-content">
+                <div class="setting-item">
+                    <label>API Key</label>
+                    <input type="password" id="api-key-input" placeholder="sk-...">
+                </div>
+                <div class="setting-item">
+                    <label>API 地址</label>
+                    <input type="text" id="base-url-input" placeholder="https://api.openai.com/v1">
+                </div>
+                <div class="setting-item">
+                    <label>模型</label>
+                    <input type="text" id="model-input" placeholder="请输入服务商提供的完整模型 ID">
+                </div>
+                <div class="setting-item">
+                    <label>温度</label>
+                    <input type="number" id="temperature-input" min="0" max="2" step="0.1" value="0.7">
+                </div>
+                <div class="setting-item">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="context-window-auto" checked>
+                        <span>自动识别模型上下文窗口</span>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label>上下文窗口（千 Token）</label>
+                    <input type="number" id="context-window-input" min="1" value="20">
+                    <div id="context-window-status" class="hint-text">正在读取检测结果…</div>
+                    <div class="hint-text">关闭自动识别后可手动填写；256 表示 256k，1000 表示 1m</div>
+                </div>
+
+                <div class="settings-section">
+                    <div class="settings-section-header">
+                        <span>外部知识检索</span>
+                        <span class="settings-section-desc">通过 Tavily 检索公开资料；搜索会显示但不会打断操作</span>
+                    </div>
+                    <div class="setting-item">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="web-search-enabled">
+                            <span>启用外部检索</span>
+                        </label>
+                    </div>
+                    <div class="setting-item web-search-settings hidden">
+                        <label>Tavily API Key</label>
+                        <input type="password" id="web-search-api-key-input" placeholder="tvly-...">
+                    </div>
+                    <div class="setting-item web-search-settings hidden">
+                        <label>检索质量</label>
+                        <select id="web-search-depth-select">
+                            <option value="advanced">深入检索（推荐，结果更相关）</option>
+                            <option value="basic">标准检索（更省额度）</option>
+                        </select>
+                    </div>
+                    <div class="setting-item web-search-settings hidden">
+                        <label>最多返回结果数</label>
+                        <input type="number" id="web-search-max-results-input" min="1" max="5" value="5">
+                    </div>
+                    <div class="setting-item web-search-settings hidden">
+                        <label>允许的站点（可选，逗号分隔）</label>
+                        <input type="text" id="web-search-domains-input" placeholder="who.int, britannica.com">
+                    </div>
+                    <div class="hint-text web-search-settings hidden">搜索启动时会显示查询词，无需确认。系统只连接固定搜索服务、限制查询和结果大小、不获取网页全文，并将所有结果作为不可信证据隔离。允许站点留空表示搜索整个公开互联网。</div>
+                </div>
+
+                <div class="settings-section">
+                    <div class="settings-section-header">
+                        <span>故事检索（RAG）</span>
+                        <span class="settings-section-desc">为工作区小说文件建立语义索引</span>
+                    </div>
+                    <div class="setting-item">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="rag-enabled">
+                            <span>启用故事检索</span>
+                        </label>
+                    </div>
+                    <div class="setting-item rag-settings hidden">
+                        <label>Embedding 服务</label>
+                        <select id="rag-provider-input"><option value="openai-compatible">云端 OpenAI 兼容</option><option value="ollama">本地 Ollama</option></select>
+                        <label>本地 Ollama 地址</label>
+                        <input id="rag-ollama-url-input" placeholder="http://127.0.0.1:11434">
+                        <label>本地模型</label>
+                        <input id="rag-ollama-model-input" placeholder="qwen3-embedding:0.6b">
+                        <span class="settings-section-desc">本地模式不使用下方云端配置，不进行云端查询改写；每批处理一段。写作模型和 LangSmith 仍会收到检索后使用的片段。</span>
+                    </div>
+                    <div class="setting-item rag-settings hidden">
+                        <label>Embedding API Key</label>
+                        <input type="password" id="rag-embedding-api-key-input" placeholder="留空则使用主 API Key">
+                    </div>
+                    <div class="setting-item rag-settings hidden">
+                        <label>Embedding API 地址</label>
+                        <input type="text" id="rag-embedding-base-url-input" placeholder="留空则使用主 API 地址">
+                    </div>
+                    <div class="setting-item rag-settings hidden">
+                        <label>Embedding 模型</label>
+                        <input type="text" id="rag-embedding-model-input" placeholder="text-embedding-3-small">
+                    </div>
+                    <div class="setting-item rag-settings hidden">
+                        <label>Embedding 批次大小</label>
+                        <input type="number" id="rag-embedding-batch-size-input" min="1" step="1" value="10">
+                        <span class="settings-section-desc">百炼 qwen3.7 最大 20，text-embedding-v4 最大 10；插件会自动限制已知模型。</span>
+                    </div>
+                    <div class="hint-text rag-settings hidden">修改 Embedding 或切块配置后，已有索引会标记为需要重建。请先保存设置，再到顶部「创作工具」选择文件并构建索引。</div>
+                </div>
+
+                <div class="settings-section">
+                    <div class="settings-section-header">
+                        <span>LangSmith Tracing</span>
+                        <span class="settings-section-desc">记录完整模型输入输出及调用链（包含提示词、正文和检索片段）</span>
+                    </div>
+                    <div class="setting-item">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="langsmith-enabled">
+                            <span>启用 LangSmith</span>
+                        </label>
+                    </div>
+                    <div class="setting-item langsmith-settings hidden">
+                        <label>API Key</label>
+                        <input type="password" id="langsmith-api-key-input" placeholder="lsv2_...">
+                    </div>
+                    <div class="setting-item langsmith-settings hidden">
+                        <label>Endpoint</label>
+                        <input type="text" id="langsmith-endpoint-input" placeholder="https://api.smith.langchain.com">
+                    </div>
+                    <div class="setting-item langsmith-settings hidden">
+                        <label>Project Name</label>
+                        <input type="text" id="langsmith-project-input" placeholder="aiwriter">
+                    </div>
+                    <div class="setting-item langsmith-settings hidden">
+                        <label>Workspace ID (可选)</label>
+                        <input type="text" id="langsmith-workspace-input" placeholder="">
+                    </div>
+                    <div class="setting-item langsmith-settings hidden">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="langsmith-tracing-input" checked>
+                            <span>启用 Tracing</span>
+                        </label>
+                    </div>
+                    <div class="setting-item langsmith-settings hidden">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="langsmith-background-input" checked>
+                            <span>后台发送回调 (降低延迟)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <div class="settings-section-header">
+                        <span>专业辅助能力</span>
+                        <span class="settings-section-desc">主助手按任务需要选择资料检索、场景拆解或小说审核</span>
+                    </div>
+                    <div class="setting-item">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="workflow-enabled">
+                            <span>允许调用冰山场景拆解</span>
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>可用专业助手</label>
+                        <div id="registered-workers-list" class="commands-list">
+                            <span class="command-chip">资料检索</span>
+                            <span class="command-chip">场景拆解</span>
+                            <span class="command-chip">小说审核</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <div class="settings-section-header">
+                        <span>解析模型配置</span>
+                        <span class="settings-section-desc">用于可选的场景拆解；未配置时沿用主模型，小说审核使用主模型</span>
+                    </div>
+                    <div class="setting-item">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="parser-enabled">
+                            <span>启用独立解析模型</span>
+                        </label>
+                    </div>
+                    <div class="setting-item parser-settings">
+                        <label>服务商</label>
+                        <select id="parser-provider-select">
+                            <option value="openai">OpenAI 兼容</option>
+                            <option value="anthropic">Anthropic</option>
+                            <option value="custom">自定义</option>
+                        </select>
+                    </div>
+                    <div class="setting-item parser-settings">
+                        <label>API Key</label>
+                        <input type="password" id="parser-api-key-input" placeholder="解析模型专用 API Key (可与主模型相同)">
+                    </div>
+                    <div class="setting-item parser-settings">
+                        <label>API 地址</label>
+                        <input type="text" id="parser-base-url-input" placeholder="https://api.openai.com/v1">
+                    </div>
+                    <div class="setting-item parser-settings">
+                        <label>模型</label>
+                        <input type="text" id="parser-model-input" placeholder="请输入服务商提供的完整模型 ID">
+                    </div>
+                    <div class="setting-item parser-settings">
+                        <label>温度</label>
+                        <input type="number" id="parser-temperature-input" min="0" max="2" step="0.1" value="0.1">
+                    </div>
+                    <div class="setting-item parser-settings">
+                        <div class="hint-text">
+                            提示：解析任务较简单，可填写服务商提供的轻量模型 ID 以节省成本
+                        </div>
+                    </div>
+                </div>
+
+                <button id="save-settings-btn" class="save-btn">保存设置</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal">
+            <div id="modal-title" class="modal-title"></div>
+            <input id="modal-input" class="modal-input" type="text">
+            <div class="modal-buttons">
+                <button id="modal-cancel" class="modal-btn modal-cancel">取消</button>
+                <button id="modal-confirm" class="modal-btn modal-confirm">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="./vendor/marked.umd.js"></script>
+    <script src="./modules/file-approval.js"></script>
+    <script src="./modules/settings.js"></script>
+    <script src="./main.js"></script>
+</body>
+</html>

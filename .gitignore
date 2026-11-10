@@ -1,0 +1,13 @@
+node_modules/
+out/
+dist/
+.vscode-test/
+*.vsix
+.aiwriter/
+.codex/
+.claude/
+.env
+.env.*
+!.env.example
+*.log
+test-results-local.txt
