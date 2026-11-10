@@ -30,40 +30,6 @@ npm run test:unit
 
 `npm test` 启动 VS Code 测试主机，首次可能下载测试版本。`npm run watch` 只监听 TypeScript；修改 Webview 后请重新执行 compile 并重新加载开发主机。
 
-## 验证与项目说明
-
-- [AI SDK Agent 执行循环重构与验证](docs/agent-runtime-refactor.md)
-
-- [本地 Ollama RAG 与云端 LangSmith 配置](docs/local-rag-langsmith.md)
-- [项目记忆与历史开发记录](docs/project-memory.md)
-- [NovelQA 评测](docs/novelqa-rag-evaluation.md)
-- [CLongEval 评测](docs/clongeval-rag-evaluation.md)
-- [Promptfoo Agent 评测](evals/README.md)
-
-当前未实现执行中断点续跑、独立模型 reranker 或完整的人物/事件状态库。自动化测试不替代真实模型与界面联调，不据此宣称生成质量或线上规模。
-
-
-### 章节摘要
-
-在顶部「创作工具」点击「生成 / 更新摘要」：默认选择「补齐缺失摘要」，已有摘要不覆盖；需要改写时选择「选择章节生成 / 更新」，勾选要覆盖的章节。取消可使用生成进度通知中的取消按钮。
-
-摘要是普通 Markdown 文件，例如 `.aiwriter/research/summaries/正文合集.md/第二章 雨夜.md`。正文可以直接手动编辑；文件头保存来源文件、章节及生成时的正文指纹，供 Agent 区分已核对版本与未核对摘要。没有文件头的手写摘要放在对应的可读路径下也会被识别，但不会被标为已核对。删除、修改或补写摘要并保存后会自动同步，不会自动调用模型。
-
-`catalog.json` 只作为可重建的章节导航索引，不保存生成失败、待更新等任务状态。正文变化不会自动覆盖摘要；Agent 按需读取摘要时核对来源版本，需要细节和引文时仍读取原文。旧 UUID 文件名会在扫描时迁移为可读文件名，原文件备份在 `.aiwriter/research/legacy-summaries/`；未关联的手写文件不会自动删除。
-
-调试控制台可搜索 `[ResearchSummary]` 查看逐章生成、耗时、结束原因、输出长度和 Token 用量；日志不包含正文和 API Key。
-
-
-### 响应观测与资料复用
-
-请求日志新增 `first_visible_output`（后端首次向侧边栏发送非空正文）和 `final_answer_start`（最终回答轮次首次输出正文），最终 `request_summary` 同时记录 `firstVisibleMs`、`finalAnswerStartMs`。它们都从请求接收时开始计时；最终回答事件在该轮确认不含工具调用后补记实际开始时间。它们不代表前端已经完成渲染，也不把隐藏推理当作可见响应。
-
-每个请求保留一份原文证据缓存，各 Agent 单独维护自己实际可见的片段。委派专业 Agent 时自动携带已有证据，优先匹配已知来源，再选近期片段；交接前校验当前正文版本，默认最多约 4,000 Token，小窗口会进一步收缩。未实际传入的资料不计为已读，变更版本仍可补查。
-
-每轮原文携带预算默认约 12,000 Token，且不超过模型窗口的四分之一；最新一次读取完整保留，必要时可临时超过该资料预算并记入日志。较早、重复或重叠的片段替换为可重新读取的定位信息，原文仍在请求缓存中。用户原始要求、附件、助手推理、工具调用参数和写入回执不作这种裁剪。该预算不限制整个任务能够读取的总资料量，也不增加模型压缩调用。
-
-`model_input` 记录各 Agent 每轮估算输入量、实际携带的原文证据量及省略数量，`evidence_handoff` 记录专业 Agent 的证据交接数量；服务商实际用量仍以 `request_summary` 为准。效果需用相同任务、模型和资料继续对照测试。
-
 ## 开源许可
 
 本项目采用 [MIT 许可证](LICENSE)。
